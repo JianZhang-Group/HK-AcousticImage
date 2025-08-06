@@ -415,6 +415,12 @@ namespace HK_AcousticImage.ViewModels
             logger.Warn(message);
         }
 
+        private void LogAndRecordError(string message)
+        {
+            AddLog("ERROR", message);
+            logger.Error(message);
+        }
+
         private void LogAndRecord(NLogLevel level, string message)
         {
             AddLog("INFO",message);
