@@ -110,7 +110,7 @@ namespace HK_AcousticImage.ViewModels
             set => SetProperty(ref _filterTime, value);
         }
 
-        private int _analysisTime = 15;
+        private int _analysisTime = 10;
         public int AnalysisTime
         {
             get => _analysisTime;
