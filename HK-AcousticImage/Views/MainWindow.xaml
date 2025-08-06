@@ -5,9 +5,14 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:prism="http://prismlibrary.com/"
         xmlns:vlc="clr-namespace:LibVLCSharp.WPF;assembly=LibVLCSharp.WPF"
+        xmlns:local="clr-namespace:HK_AcousticImage.ViewModels"
         mc:Ignorable="d"
         Title="HK Acoustic Image"
         Height="720" Width="1280">
+
+    <Window.Resources>
+        <local:LogLevelToBrushConverter x:Key="LogLevelToBrushConverter"/>
+    </Window.Resources>
 
     <Grid Margin="10">
         <Grid.RowDefinitions>
@@ -70,10 +75,10 @@
                 <!-- 声学检漏参数 -->
                 <GroupBox Header="声学检漏参数" Margin="0,0,0,10">
                     <StackPanel Orientation="Horizontal" Margin="10">
-                        <Label Content="检测阈值:" Width="63"/>
-                        <TextBox Width="40" Text="{Binding Threshold}"/>
-                        <Label Content="时长(s):" Width="62" Margin="10,0,0,0"/>
-                        <TextBox Width="46" Text="{Binding Duration}"/>
+                        <Label Content="过滤时间:" Width="63"/>
+                        <TextBox Width="40" Text="{Binding FilterTime}"/>
+                        <Label Content="分析时长:" Width="62" Margin="10,0,0,0"/>
+                        <TextBox Width="46" Text="{Binding AnalysisTime}"/>
                         <Button Content="获取" Width="70" Margin="10,0,0,0"
                                 Command="{Binding GetAcousticParamsCommand}"/>
                         <Button Content="设置" Width="70" Margin="5,0,0,0"
@@ -114,14 +119,31 @@
 
             <!-- 右侧视频 -->
             <GroupBox Header="视频播放" Grid.Column="1" Margin="10,10,10,10">
-                <vlc:VideoView x:Name="videoView"/>
+                <vlc:VideoView x:Name="videoView">
+                </vlc:VideoView>
             </GroupBox>
         </Grid>
 
         <!-- 日志输出 -->
         <GroupBox Header="日志输出" Grid.Row="2">
             <ListBox ItemsSource="{Binding LogMessages}"
-                     HorizontalContentAlignment="Left"/>
+             VirtualizingStackPanel.IsVirtualizing="True"
+             VirtualizingStackPanel.VirtualizationMode="Recycling"
+             ScrollViewer.VerticalScrollBarVisibility="Auto"
+             local:ListBoxAutoScrollBehavior.AutoScroll="True">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock>
+                    <Run Text="{Binding Time}" Foreground="Gray"/>
+                    <Run Text=" [" Foreground="Black"/>
+                    <Run Text="{Binding Level}" 
+                         Foreground="{Binding Level, Converter={StaticResource LogLevelToBrushConverter}}"/>
+                    <Run Text="] " Foreground="Black"/>
+                    <Run Text="{Binding Message}" Foreground="Black"/>
+                        </TextBlock>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
         </GroupBox>
     </Grid>
 </Window>

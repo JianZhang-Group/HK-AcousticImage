@@ -1,11 +1,18 @@
 ﻿using HK_AcousticImage_Api;
 using LibVLCSharp.Shared;
+using LibVLCSharp.WPF;
+using Newtonsoft.Json;
 using NLog;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using NLogLevel = NLog.LogLevel;
 using VlcLogLevel = LibVLCSharp.Shared.LogLevel;
+using VlcMediaPlayer = LibVLCSharp.Shared.MediaPlayer;
 
 namespace HK_AcousticImage.ViewModels
 {
@@ -17,7 +24,7 @@ namespace HK_AcousticImage.ViewModels
         private AlarmHttpServer? alarmServer;
 
         private LibVLC _libVLC;
-        private MediaPlayer _mediaPlayer;
+        private VlcMediaPlayer _mediaPlayer;
         public DelegateCommand PlayRtspCommand { get; }
         public DelegateCommand StopRtspCommand { get; }
 
@@ -36,7 +43,7 @@ namespace HK_AcousticImage.ViewModels
             set => SetProperty(ref _username, value);
         }
 
-        private string _password = "";
+        private string _password = "HK@minshi";
         public string Password
         {
             get => _password;
@@ -57,8 +64,7 @@ namespace HK_AcousticImage.ViewModels
             set => SetProperty(ref _hostId, value);
         }
 
-        public ObservableCollection<string> ProtocolOptions { get; }
-= new ObservableCollection<string> { "HTTP", "HTTPS" };
+        public ObservableCollection<string> ProtocolOptions { get; }= new ObservableCollection<string> { "HTTP", "HTTPS" };
         private string _protocol = "HTTP"; // 默认值
         public string Protocol
         {
@@ -87,7 +93,29 @@ namespace HK_AcousticImage.ViewModels
             set => SetProperty(ref _duration, value);
         }
 
-        public ObservableCollection<string> LogMessages { get; } = new ObservableCollection<string>();
+        private string _acousticParamsResult = "未获取";
+        public string AcousticParamsResult
+        {
+            get => _acousticParamsResult;
+            set => SetProperty(ref _acousticParamsResult, value);
+        }
+
+        private int _filterTime = 60;
+        public int FilterTime
+        {
+            get => _filterTime;
+            set => SetProperty(ref _filterTime, value);
+        }
+
+        private int _analysisTime = 15;
+        public int AnalysisTime
+        {
+            get => _analysisTime;
+            set => SetProperty(ref _analysisTime, value);
+        }
+
+        //public ObservableCollection<string> LogMessages { get; } = new ObservableCollection<string>();
+        public ObservableCollection<LogEntry> LogMessages { get; } = new();
 
         public ICommand LoginCommand { get; }
         public ICommand GetAlarmHostsCommand { get; }
@@ -97,12 +125,14 @@ namespace HK_AcousticImage.ViewModels
         public ICommand StopSoundCommand { get; }
         public ICommand StartAlarmServerCommand { get; }
         public ICommand StopAlarmServerCommand { get; }
+        public ICommand GetAcousticParamsCommand { get; }
+        public ICommand SetAcousticParamsCommand { get; }
 
         public MainViewModel()
         {
             Core.Initialize();
             _libVLC = new LibVLC();
-            _mediaPlayer = new MediaPlayer(_libVLC);
+            _mediaPlayer = new VlcMediaPlayer(_libVLC);
 
             LoginCommand = new DelegateCommand(async () => await LoginAsync());
             GetAlarmHostsCommand = new DelegateCommand(async () => await GetAlarmHostsAsync());
@@ -114,6 +144,56 @@ namespace HK_AcousticImage.ViewModels
             StopAlarmServerCommand = new DelegateCommand(StopAlarmServer);
             PlayRtspCommand = new DelegateCommand(OnPlayRtsp);
             StopRtspCommand = new DelegateCommand(OnStopRtsp);
+            GetAcousticParamsCommand = new DelegateCommand(async () => await GetAcousticParamsAsync());
+            SetAcousticParamsCommand = new DelegateCommand(async () => await SetAcousticParamsAsync());
+        }
+
+        private async Task GetAcousticParamsAsync()
+        {
+            if (!CheckDevice())
+                return;
+
+            LogAndRecordInfo("开始获取声学检漏参数...");
+
+            var result = await device!.GetAcousticParamsAsync();
+
+            if (result != null)
+            {
+
+                // 自动赋值
+                FilterTime = (int)(result.filterTime ?? FilterTime);
+                AnalysisTime = (int)(result.analysisTime ?? AnalysisTime);
+
+                AcousticParamsResult = JsonConvert.SerializeObject(result, Formatting.Indented);
+                LogAndRecordInfo("获取成功：" + AcousticParamsResult);
+            }
+            else
+            {
+                AcousticParamsResult = "获取失败";
+                LogAndRecordWarn("❌ 获取声学检漏参数失败");
+            }
+        }
+
+        private async Task SetAcousticParamsAsync()
+        {
+            if (!CheckDevice())
+                return;
+
+            LogAndRecordInfo($"开始设置声学检漏参数，过滤时长={FilterTime}，分析时长={AnalysisTime}");
+
+            var result = await device!.SetAcousticParamsAsync(FilterTime, AnalysisTime);
+
+            if (result != null)
+            {
+
+                AcousticParamsResult = JsonConvert.SerializeObject(result, Formatting.Indented);
+                LogAndRecordInfo("设置成功：" + AcousticParamsResult);
+            }
+            else
+            {
+                AcousticParamsResult = "设置失败";
+                LogAndRecordWarn("❌ 设置声学检漏参数失败");
+            }
         }
 
         private async Task LoginAsync()
@@ -258,12 +338,11 @@ namespace HK_AcousticImage.ViewModels
         // 收到报警事件回调
         private void AlarmServer_AlarmReceived(object? sender, AlarmEventArgs e)
         {
-            // UI 线程安全考虑，使用 Dispatcher，假设你的 ViewModel 有 Dispatcher 或用 SynchronizationContext
             System.Windows.Application.Current.Dispatcher.Invoke(() =>
             {
-                string msg = $"🔔 报警事件：类型={e.EventType}, 描述={e.EventDescription}, 时间={e.DateTime}, 设备={e.DeviceIp}";
-                AddLog(msg);
-                logger.Info(msg);
+                string msg = $"🔔 报警事件：事件类型={e.EventType}, 描述={e.EventDescription},报警类型={e.AlarmType}, 时间={e.DateTime}, 设备={e.DeviceIp}";
+                //MessageBox.Show(msg);
+                LogAndRecordWarn(msg);
             });
         }
 
@@ -274,11 +353,11 @@ namespace HK_AcousticImage.ViewModels
                 string rtspUrl = $"rtsp://{Username}:{Password}@{DeviceIp}:554/ISAPI/Streaming/Channels/101";
                 var media = new Media(_libVLC, rtspUrl, FromType.FromLocation);
                 _mediaPlayer.Play(media);
-                MessageBox.Show("开始播放视频");
+                LogAndRecordInfo("视频播放已开始");
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"播放失败: {ex.Message}");
+                LogAndRecordWarn($"播放失败: {ex.Message}");
             }
         }
 
@@ -287,34 +366,115 @@ namespace HK_AcousticImage.ViewModels
             if (_mediaPlayer.IsPlaying)
             {
                 _mediaPlayer.Stop();
-                MessageBox.Show("已停止播放");
+                LogAndRecordWarn("已停止播放");
             }
         }
 
-        public MediaPlayer GetMediaPlayer() => _mediaPlayer;
+
+
+        public VlcMediaPlayer GetMediaPlayer() => _mediaPlayer;
 
 
         private void LogAndRecordInfo(string message)
         {
-            AddLog(message);
+            AddLog("INFO", message);
             logger.Info(message);
         }
 
         private void LogAndRecordWarn(string message)
         {
-            AddLog(message);
+            AddLog("WARN", message);
             logger.Warn(message);
         }
 
         private void LogAndRecord(NLogLevel level, string message)
         {
-            AddLog(message);
+            AddLog("INFO",message);
             logger.Log(level, message);
         }
 
-        private void AddLog(string message)
+        private void AddLog(string level, string message)
         {
-            LogMessages.Add($"{System.DateTime.Now:HH:mm:ss} - {message}");
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                LogMessages.Add(new LogEntry { Level = level, Message = message });
+                if (LogMessages.Count > 10) // 避免爆内存
+                    LogMessages.RemoveAt(0);
+            });
+        }
+
+
+    }
+
+    public class LogEntry
+    {
+        public string Time { get; set; } = DateTime.Now.ToString("HH:mm:ss");
+        public string Level { get; set; } = "INFO";
+        public string Message { get; set; } = "";
+    }
+
+    public class LogLevelToBrushConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            string level = value?.ToString()?.ToUpper() ?? "INFO";
+            return level switch
+            {
+                "ERROR" => Brushes.Red,
+                "WARN" => Brushes.Orange,
+                "INFO" => Brushes.Green,
+                _ => Brushes.Black,
+            };
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => throw new NotImplementedException();
+    }
+
+    public static class ListBoxAutoScrollBehavior
+    {
+        public static readonly DependencyProperty AutoScrollProperty =
+            DependencyProperty.RegisterAttached(
+                "AutoScroll",
+                typeof(bool),
+                typeof(ListBoxAutoScrollBehavior),
+                new PropertyMetadata(false, OnAutoScrollChanged));
+
+        public static bool GetAutoScroll(DependencyObject obj)
+        {
+            return (bool)obj.GetValue(AutoScrollProperty);
+        }
+
+        public static void SetAutoScroll(DependencyObject obj, bool value)
+        {
+            obj.SetValue(AutoScrollProperty, value);
+        }
+
+        private static void OnAutoScrollChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is ListBox listBox)
+            {
+                if ((bool)e.NewValue)
+                {
+                    listBox.Loaded += (s, ev) =>
+                    {
+                        if (listBox.Items.Count > 0)
+                            listBox.ScrollIntoView(listBox.Items[^1]);
+                    };
+
+                    listBox.TargetUpdated += (s, ev) =>
+                    {
+                        if (listBox.Items.Count > 0)
+                            listBox.ScrollIntoView(listBox.Items[^1]);
+                    };
+
+                    listBox.ItemContainerGenerator.ItemsChanged += (s, ev) =>
+                    {
+                        if (listBox.Items.Count > 0)
+                            listBox.ScrollIntoView(listBox.Items[^1]);
+                    };
+                }
+            }
         }
     }
 }

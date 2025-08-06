@@ -19,6 +19,15 @@ namespace HK_AcousticImage_Api
         public string DeviceIp { get; set; }
         public string MacAddress { get; set; }
         public string RawXml { get; set; }
+
+        // 新增字段
+        public string ActivePostCount { get; set; }
+        public string AlarmType { get; set; }
+        public string ResourcesContentType { get; set; }
+        public string ResourcesContent { get; set; }
+        public string ResourcesFormatType { get; set; }
+        public string PictureHeight { get; set; }
+        public string PictureWidth { get; set; }
     }
 
     public class AlarmHttpServer
@@ -151,10 +160,10 @@ namespace HK_AcousticImage_Api
                     string filename = file.FileName;
                     string saveName = filename;
 
-                    using (var fs = new FileStream(saveName, FileMode.Create, FileAccess.Write))
-                    {
-                        file.Data.CopyTo(fs);
-                    }
+                    //using (var fs = new FileStream(saveName, FileMode.Create, FileAccess.Write))
+                    //{
+                    //    file.Data.CopyTo(fs);
+                    //}
 
                     logger.Info($"🖼️ 收到文件: {filename}, 大小: {file.Data.Length} 字节");
 
@@ -189,23 +198,33 @@ namespace HK_AcousticImage_Api
                 string ns = doc.DocumentElement.NamespaceURI;
                 nsMgr.AddNamespace("hk", ns);
 
-                string GetText(string tag)
+                string GetText(string xpath)
                 {
-                    var node = doc.SelectSingleNode($"//hk:{tag}", nsMgr);
+                    var node = doc.SelectSingleNode(xpath, nsMgr);
                     return node?.InnerText ?? "";
                 }
 
-                string ipAddress = GetText("ipAddress");
-                string ipv4Address = GetText("ipV4Address");
-                string portNo = GetText("portNo");
-                string protocol = GetText("protocol");
-                string macAddress = GetText("macAddress");
-                string channelId = GetText("channelID");
-                string channelName = GetText("channelName");
-                string dateTime = GetText("dateTime");
-                string eventType = GetText("eventType");
-                string eventState = GetText("eventState");
-                string eventDesc = GetText("eventDescription");
+                // 基础字段
+                string ipAddress = GetText("//hk:ipAddress");
+                string ipv4Address = GetText("//hk:ipV4Address");
+                string portNo = GetText("//hk:portNo");
+                string protocol = GetText("//hk:protocol");
+                string macAddress = GetText("//hk:macAddress");
+                string channelId = GetText("//hk:channelID");
+                string channelName = GetText("//hk:channelName");
+                string dateTime = GetText("//hk:dateTime");
+                string eventType = GetText("//hk:eventType");
+                string eventState = GetText("//hk:eventState");
+                string eventDesc = GetText("//hk:eventDescription");
+                string activePostCount = GetText("//hk:activePostCount");
+                string alarmType = GetText("//hk:AudioExceptionDetection/hk:alarmType");
+
+                // 资源信息
+                string resourcesContentType = GetText("//hk:ResourcesName/hk:resourcesContentType");
+                string resourcesContent = GetText("//hk:ResourcesName/hk:resourcesContent");
+                string resourcesFormatType = GetText("//hk:ResourcesName/hk:resourcesFormatType");
+                string pictureHeight = GetText("//hk:ResourcesName/hk:pictureResolution/hk:height");
+                string pictureWidth = GetText("//hk:ResourcesName/hk:pictureResolution/hk:width");
 
                 logger.Info("🔔 报警详情：");
                 logger.Info($"  - 类型: {eventType}");
@@ -215,6 +234,9 @@ namespace HK_AcousticImage_Api
                 logger.Info($"  - 通道: {channelId} ({channelName})");
                 logger.Info($"  - 设备IP: {ipAddress ?? ipv4Address}:{portNo} [{protocol}]");
                 logger.Info($"  - MAC地址: {macAddress}");
+                logger.Info($"  - 上报次数: {activePostCount}");
+                logger.Info($"  - 报警子类型: {alarmType}");
+                logger.Info($"  - 图片格式: {resourcesFormatType}, 尺寸: {pictureWidth}x{pictureHeight}");
 
                 AlarmReceived?.Invoke(this, new AlarmEventArgs
                 {
@@ -226,6 +248,13 @@ namespace HK_AcousticImage_Api
                     ChannelName = channelName,
                     DeviceIp = (ipAddress ?? ipv4Address) + ":" + portNo,
                     MacAddress = macAddress,
+                    ActivePostCount = activePostCount,
+                    AlarmType = alarmType,
+                    ResourcesContentType = resourcesContentType,
+                    ResourcesContent = resourcesContent,
+                    ResourcesFormatType = resourcesFormatType,
+                    PictureHeight = pictureHeight,
+                    PictureWidth = pictureWidth,
                     RawXml = xmlText
                 });
 

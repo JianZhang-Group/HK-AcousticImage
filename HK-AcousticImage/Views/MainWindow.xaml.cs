@@ -12,7 +12,11 @@ namespace HK_AcousticImage
         {
             InitializeComponent();
 
-            this.DataContext = new MainViewModel();
+            var vm = new MainViewModel();
+            this.DataContext = vm;
+
+            // 将 MediaPlayer 绑定到 VideoView
+            videoView.MediaPlayer = vm.GetMediaPlayer();
         }
     }
 }
