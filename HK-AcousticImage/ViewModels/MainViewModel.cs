@@ -28,6 +28,9 @@ namespace HK_AcousticImage.ViewModels
         public DelegateCommand PlayRtspCommand { get; }
         public DelegateCommand StopRtspCommand { get; }
 
+        private int[] filterTimeOptions = new int[] { 60, 120 };
+        private int filterTimeIndex = 0;
+
 
         private string _deviceIp = "192.168.31.64";
         public string DeviceIp
@@ -307,7 +310,7 @@ namespace HK_AcousticImage.ViewModels
                 return;
             }
 
-            // 默认监听本机所有接口的8080端口，你可扩展为绑定界面输入端口
+            // 默认监听本机所有接口的8080端口
             string url = $"http://+:{HostPort}/";
             alarmServer = new AlarmHttpServer(url);
 
@@ -334,17 +337,42 @@ namespace HK_AcousticImage.ViewModels
 
             LogAndRecordInfo("报警服务已停止");
         }
-
+        
         // 收到报警事件回调
         private void AlarmServer_AlarmReceived(object? sender, AlarmEventArgs e)
         {
-            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            Application.Current.Dispatcher.Invoke(async () =>
             {
-                string msg = $"🔔 报警事件：事件类型={e.EventType}, 描述={e.EventDescription},报警类型={e.AlarmType}, 时间={e.DateTime}, 设备={e.DeviceIp}";
-                //MessageBox.Show(msg);
+                string msg = $"🔔 报警事件：事件类型={e.EventType}, 描述={e.EventDescription}, 报警类型={e.AlarmType}, 时间={e.DateTime}, 设备={e.DeviceIp}";
                 LogAndRecordWarn(msg);
+
+                try
+                {
+                    // 1. 停止采集
+                    LogAndRecordInfo("收到报警，先停止声源检测...");
+                    await StopSoundAsync();
+
+                    // 切换 FilterTime
+                    FilterTime = filterTimeOptions[filterTimeIndex];
+                    filterTimeIndex = (filterTimeIndex + 1) % filterTimeOptions.Length;  // 轮换下一个
+
+                    // 2. 重新设定参数
+                    LogAndRecordInfo("重新设定声学检漏参数...");
+                    await SetAcousticParamsAsync();
+
+                    // 3. 再次启动采集
+                    LogAndRecordInfo("重新启动声源检测...");
+                    await StartSoundAsync();
+
+                    LogAndRecordInfo("报警处理流程完成 ✅");
+                }
+                catch (Exception ex)
+                {
+                    LogAndRecordWarn($"报警处理失败：{ex.Message}");
+                }
             });
         }
+
 
         private void OnPlayRtsp()
         {
