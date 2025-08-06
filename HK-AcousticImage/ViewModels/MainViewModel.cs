@@ -5,6 +5,7 @@ using Newtonsoft.Json;
 using NLog;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Net.NetworkInformation;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -18,6 +19,7 @@ namespace HK_AcousticImage.ViewModels
 {
     public class MainViewModel : BindableBase
     {
+        #region 字段与初始化
         private static readonly Logger logger = LogManager.GetCurrentClassLogger();
 
         private HKAcousticImageDevice? device;
@@ -30,8 +32,9 @@ namespace HK_AcousticImage.ViewModels
 
         private int[] filterTimeOptions = new int[] { 60, 120 };
         private int filterTimeIndex = 0;
+        #endregion
 
-
+        # region 属性绑定
         private string _deviceIp = "192.168.31.64";
         public string DeviceIp
         {
@@ -131,6 +134,9 @@ namespace HK_AcousticImage.ViewModels
         public ICommand GetAcousticParamsCommand { get; }
         public ICommand SetAcousticParamsCommand { get; }
 
+        #endregion
+
+        #region 命令绑定初始化
         public MainViewModel()
         {
             Core.Initialize();
@@ -150,7 +156,95 @@ namespace HK_AcousticImage.ViewModels
             GetAcousticParamsCommand = new DelegateCommand(async () => await GetAcousticParamsAsync());
             SetAcousticParamsCommand = new DelegateCommand(async () => await SetAcousticParamsAsync());
         }
+        #endregion
 
+        #region 登录与设备校验
+        private bool CheckDevice()
+        {
+            if (device == null)
+            {
+                LogAndRecordWarn("❌ 请先登录设备");
+                return false;
+            }
+            return true;
+        }
+
+        private async Task LoginAsync()
+        {
+            string msg = $"开始登录，设备IP：{DeviceIp}, 用户名：{Username}";
+            LogAndRecordInfo(msg);
+
+            device = new HKAcousticImageDevice(DeviceIp, Username, Password);
+
+            var (success, message) = await device.CheckLoginAsync();
+
+            LogAndRecord(success ? NLogLevel.Info : NLogLevel.Warn, message);
+
+            if (!success)
+            {
+                device = null;
+            }
+        }
+        #endregion
+
+        #region 报警主机操作
+        private async Task GetAlarmHostsAsync()
+        {
+            if (!CheckDevice())
+                return;
+
+            LogAndRecordInfo("开始获取监听主机配置...");
+
+            var hosts = await device!.GetAlarmHostsAsync();
+
+            if (hosts != null)
+            {
+                LogAndRecordInfo("监听主机配置:\n" + hosts);
+            }
+            else
+            {
+                LogAndRecordError("❌ 获取监听主机配置失败");
+            }
+        }
+
+        private async Task ConfigAlarmHostAsync()
+        {
+            if (!CheckDevice())
+                return;
+
+            if (!int.TryParse(HostPort, out int port))
+            {
+                LogAndRecordError("端口号输入无效");
+                return;
+            }
+
+            LogAndRecordInfo($"开始配置监听主机: IP={HostUrl}, 端口={port}");
+
+            bool success = await device!.ConfigAlarmHostAsync(HostUrl, port);
+
+            if (success)
+                LogAndRecordInfo("监听主机配置成功");
+            else
+                LogAndRecordError("监听主机配置失败");
+        }
+
+        private async Task TestAlarmHostAsync()
+        {
+            if (!CheckDevice())
+                return;
+
+            LogAndRecordInfo("开始测试监听主机连接...");
+
+            bool success = await device!.TestHttpHostAsync();
+
+            if (success)
+                LogAndRecordInfo("监听主机测试成功");
+            else
+                LogAndRecordError("监听主机测试失败");
+        }
+        #endregion
+
+        #region 声学检测相关
         private async Task GetAcousticParamsAsync()
         {
             if (!CheckDevice())
@@ -173,7 +267,7 @@ namespace HK_AcousticImage.ViewModels
             else
             {
                 AcousticParamsResult = "获取失败";
-                LogAndRecordWarn("❌ 获取声学检漏参数失败");
+                LogAndRecordError("❌ 获取声学检漏参数失败");
             }
         }
 
@@ -190,85 +284,13 @@ namespace HK_AcousticImage.ViewModels
             {
 
                 AcousticParamsResult = JsonConvert.SerializeObject(result, Formatting.Indented);
-                LogAndRecordInfo("设置成功：" + AcousticParamsResult);
+                LogAndRecordInfo("设置成功!");
             }
             else
             {
                 AcousticParamsResult = "设置失败";
-                LogAndRecordWarn("❌ 设置声学检漏参数失败");
+                LogAndRecordError("❌ 设置声学检漏参数失败");
             }
-        }
-
-        private async Task LoginAsync()
-        {
-            string msg = $"开始登录，设备IP：{DeviceIp}, 用户名：{Username}";
-            LogAndRecordInfo(msg);
-
-            device = new HKAcousticImageDevice(DeviceIp, Username, Password);
-
-            var (success, message) = await device.CheckLoginAsync();
-
-            LogAndRecord(success ? NLogLevel.Info : NLogLevel.Warn, message);
-
-            if (!success)
-            {
-                device = null;
-            }
-        }
-
-        private async Task GetAlarmHostsAsync()
-        {
-            if (!CheckDevice())
-                return;
-
-            LogAndRecordInfo("开始获取监听主机配置...");
-
-            var hosts = await device!.GetAlarmHostsAsync();
-
-            if (hosts != null)
-            {
-                LogAndRecordInfo("监听主机配置:\n" + hosts);
-            }
-            else
-            {
-                LogAndRecordWarn("❌ 获取监听主机配置失败");
-            }
-        }
-
-        private async Task ConfigAlarmHostAsync()
-        {
-            if (!CheckDevice())
-                return;
-
-            if (!int.TryParse(HostPort, out int port))
-            {
-                LogAndRecordWarn("端口号输入无效");
-                return;
-            }
-
-            LogAndRecordInfo($"开始配置监听主机: IP={HostUrl}, 端口={port}");
-
-            bool success = await device!.ConfigAlarmHostAsync(HostUrl, port);
-
-            if (success)
-                LogAndRecordInfo("监听主机配置成功");
-            else
-                LogAndRecordWarn("监听主机配置失败");
-        }
-
-        private async Task TestAlarmHostAsync()
-        {
-            if (!CheckDevice())
-                return;
-
-            LogAndRecordInfo("开始测试监听主机连接...");
-
-            bool success = await device!.TestHttpHostAsync();
-
-            if (success)
-                LogAndRecordInfo("监听主机测试成功");
-            else
-                LogAndRecordWarn("监听主机测试失败");
         }
 
         private async Task StartSoundAsync()
@@ -290,17 +312,9 @@ namespace HK_AcousticImage.ViewModels
 
             await device!.StopSoundLocationAsync();
         }
+        #endregion
 
-        private bool CheckDevice()
-        {
-            if (device == null)
-            {
-                LogAndRecordWarn("❌ 请先登录设备");
-                return false;
-            }
-            return true;
-        }
-
+        #region 报警服务控制
         // 启动报警服务
         private void StartAlarmServer()
         {
@@ -310,15 +324,32 @@ namespace HK_AcousticImage.ViewModels
                 return;
             }
 
-            // 默认监听本机所有接口的8080端口
+            if (!IsPortAvailable(int.Parse(HostPort)))
+            {
+                LogAndRecordError($"端口 {HostPort} 已被占用，请更换端口。");
+                return;
+            }
+
             string url = $"http://+:{HostPort}/";
             alarmServer = new AlarmHttpServer(url);
-
             alarmServer.AlarmReceived += AlarmServer_AlarmReceived;
 
             alarmServer.Start();
+            LogAndRecordInfo($"报警服务启动成功，监听地址：{url}");
+        }
 
-            LogAndRecordInfo($"报警服务启动，监听地址：{url}");
+        public static bool IsPortAvailable(int port)
+        {
+            IPGlobalProperties ipGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
+            var tcpEndPoints = ipGlobalProperties.GetActiveTcpListeners();
+
+            foreach (var endpoint in tcpEndPoints)
+            {
+                if (endpoint.Port == port)
+                    return false; // 已占用
+            }
+
+            return true; // 可用
         }
 
         // 停止报警服务
@@ -337,7 +368,9 @@ namespace HK_AcousticImage.ViewModels
 
             LogAndRecordInfo("报警服务已停止");
         }
-        
+        #endregion
+
+        #region 报警事件回调处理
         // 收到报警事件回调
         private void AlarmServer_AlarmReceived(object? sender, AlarmEventArgs e)
         {
@@ -372,8 +405,9 @@ namespace HK_AcousticImage.ViewModels
                 }
             });
         }
+        #endregion
 
-
+        #region 视频播放控制
         private void OnPlayRtsp()
         {
             try
@@ -385,7 +419,7 @@ namespace HK_AcousticImage.ViewModels
             }
             catch (Exception ex)
             {
-                LogAndRecordWarn($"播放失败: {ex.Message}");
+                LogAndRecordError($"播放失败: {ex.Message}");
             }
         }
 
@@ -394,7 +428,7 @@ namespace HK_AcousticImage.ViewModels
             if (_mediaPlayer.IsPlaying)
             {
                 _mediaPlayer.Stop();
-                LogAndRecordWarn("已停止播放");
+                LogAndRecordInfo("已停止播放");
             }
         }
 
@@ -402,7 +436,9 @@ namespace HK_AcousticImage.ViewModels
 
         public VlcMediaPlayer GetMediaPlayer() => _mediaPlayer;
 
+        #endregion
 
+        #region 日志相关
         private void LogAndRecordInfo(string message)
         {
             AddLog("INFO", message);
@@ -414,7 +450,7 @@ namespace HK_AcousticImage.ViewModels
             AddLog("WARN", message);
             logger.Warn(message);
         }
-
+        
         private void LogAndRecordError(string message)
         {
             AddLog("ERROR", message);
@@ -510,5 +546,7 @@ namespace HK_AcousticImage.ViewModels
                 }
             }
         }
+        #endregion
     }
+
 }
