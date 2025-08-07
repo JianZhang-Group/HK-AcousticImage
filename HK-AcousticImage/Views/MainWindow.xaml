@@ -105,8 +105,7 @@
                                 Command="{Binding StopAlarmServerCommand}"/>
                         <!-- 状态灯 -->
                         <TextBlock Text="服务状态:"  Margin="10,0,10,0"/>
-                        <Ellipse Width="20" Height="20" Margin="10,0"
-             VerticalAlignment="Center">
+                        <Ellipse Width="20" Height="20" Margin="10,0" VerticalAlignment="Center">
                             <Ellipse.Style>
                                 <Style TargetType="Ellipse">
                                     <Setter Property="Fill" Value="Gray"/>

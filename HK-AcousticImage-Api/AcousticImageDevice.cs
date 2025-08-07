@@ -176,8 +176,7 @@ namespace HK_AcousticImage_Api
             {
                 logger.Warn("❌ 启动失败: " + await resp.Content.ReadAsStringAsync());
                 return false;
-            }
-                
+            }          
         }
 
         // 停止声源检测
@@ -201,9 +200,9 @@ namespace HK_AcousticImage_Api
         }
 
         // 获取音频侦测能力
-        public async Task<string?> GetAudioDetectionCapabilitiesAsync(string channelId)
+        public async Task<string?> GetAudioDetectionCapabilitiesAsync()
         {
-            string url = $"http://{deviceIp}/ISAPI/Smart/AudioDetection/channels/{channelId}/capabilities";
+            string url = $"http://{deviceIp}/ISAPI/Smart/AudioDetection/channels/{audioInId}/capabilities";
             var resp = await httpClient.GetAsync(url);
             var content = await resp.Content.ReadAsStringAsync();
 
@@ -217,9 +216,9 @@ namespace HK_AcousticImage_Api
         }
 
         // 获取音频侦测参数
-        public async Task<string?> GetAudioDetectionParamsAsync(string channelId)
+        public async Task<string?> GetAudioDetectionParamsAsync()
         {
-            string url = $"http://{deviceIp}/ISAPI/Smart/AudioDetection/channels/{channelId}";
+            string url = $"http://{deviceIp}/ISAPI/Smart/AudioDetection/channels/{audioInId}";
             var resp = await httpClient.GetAsync(url);
             var content = await resp.Content.ReadAsStringAsync();
 
@@ -234,20 +233,19 @@ namespace HK_AcousticImage_Api
 
         // 设置音频侦测参数
         public async Task<string?> SetAudioDetectionParamsAsync(
-            string channelId,
-            int audioMode = 0,
-            int decibelThreshold = 0,
-            float decibelThresholdDuration = 0,
-            bool frequencyEnabled = true,
+            int audioMode = 3,
+            int decibelThreshold = 10,
+            float decibelThresholdDuration = 10,
+            bool frequencyEnabled = false,
             int frequencyThreshold = 0,
-            float frequencyThresholdDuration = 0)
+            float frequencyThresholdDuration = 10)
         {
-            string url = $"http://{deviceIp}/ISAPI/Smart/AudioDetection/channels/{channelId}";
+            string url = $"http://{deviceIp}/ISAPI/Smart/AudioDetection/channels/{audioInId}";
 
             // 构造 XML 报文
             string payload = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
-                <AudioDetection xmlns=""http://www.isapi.org/ver20/XMLSchema"" version=""2.0"">
-                <id>{channelId}</id>
+                <AudioDetection xmlns=""http://www.hikivision.com/ver20/XMLSchema"" version=""2.0"">
+                <id>{audioInId}</id>
                 <audioMode>{audioMode}</audioMode>
                 <decibelThreshold>{decibelThreshold}</decibelThreshold>
                 <decibelThresholdDuration>{decibelThresholdDuration}</decibelThresholdDuration>

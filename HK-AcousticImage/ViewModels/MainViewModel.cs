@@ -20,7 +20,7 @@ using VlcMediaPlayer = LibVLCSharp.Shared.MediaPlayer;
 
 namespace HK_AcousticImage.ViewModels
 {
-    #region VIEWMODEL
+    #region VIEWMODEL类
     public class MainViewModel : BindableBase
     {
         #region 字段与初始化
@@ -147,7 +147,7 @@ namespace HK_AcousticImage.ViewModels
         public ICommand StopAlarmServerCommand { get; }
         public ICommand GetAcousticParamsCommand { get; }
         public ICommand SetAcousticParamsCommand { get; }
-
+        public ICommand GetAudioDetectionParamsCommand { get; }
         public ICommand ShowImageCommand { get; }
 
         #endregion
@@ -171,7 +171,9 @@ namespace HK_AcousticImage.ViewModels
             StopRtspCommand = new DelegateCommand(OnStopRtsp);
             GetAcousticParamsCommand = new DelegateCommand(async () => await GetAcousticParamsAsync());
             SetAcousticParamsCommand = new DelegateCommand(async () => await SetAcousticParamsAsync());
+            GetAudioDetectionParamsCommand = new DelegateCommand(async () => await GetAudioDetectionParamsAsync());
             ShowImageCommand = new DelegateCommand<AlarmImageEntry>(ShowImage);
+
         }
         #endregion
 
@@ -307,6 +309,25 @@ namespace HK_AcousticImage.ViewModels
             {
                 AcousticParamsResult = "设置失败";
                 LogAndRecordError("❌ 设置声学检漏参数失败");
+            }
+        }
+
+        private async Task GetAudioDetectionParamsAsync()
+        {
+            if (!CheckDevice())
+                return;
+
+            LogAndRecordInfo($"开始获取音频侦测参数");
+
+            var result = await device!.GetAudioDetectionParamsAsync();
+
+            if (result != null)
+            {
+                LogAndRecordInfo("获取成功!"+ result);
+            }
+            else
+            {
+                LogAndRecordError("❌ 获取失败");
             }
         }
 
