@@ -120,6 +120,13 @@ namespace HK_AcousticImage.ViewModels
             set => SetProperty(ref _analysisTime, value);
         }
 
+        private bool _isRunning = false;
+        public bool IsRunning
+        {
+            get => _isRunning;
+            set => SetProperty(ref _isRunning, value);
+        }
+
         //public ObservableCollection<string> LogMessages { get; } = new ObservableCollection<string>();
         public ObservableCollection<LogEntry> LogMessages { get; } = new();
 
@@ -262,7 +269,7 @@ namespace HK_AcousticImage.ViewModels
                 AnalysisTime = (int)(result.analysisTime ?? AnalysisTime);
 
                 AcousticParamsResult = JsonConvert.SerializeObject(result, Formatting.Indented);
-                LogAndRecordInfo("获取成功：" + AcousticParamsResult);
+                LogAndRecordInfo($"获取成功=>过滤时间 {FilterTime}(s);分析时间 {AnalysisTime}(s)");
             }
             else
             {
@@ -300,7 +307,15 @@ namespace HK_AcousticImage.ViewModels
 
             LogAndRecordInfo("启动声源检测...");
 
-            await device!.StartSoundLocationAsync();
+            var result = await device!.StartSoundLocationAsync();
+            if (result == true)
+            {
+                LogAndRecordInfo("启动成功!");
+            }
+            else
+            {
+                LogAndRecordError("启动失败!");
+            }
         }
 
         private async Task StopSoundAsync()
@@ -310,7 +325,15 @@ namespace HK_AcousticImage.ViewModels
 
             LogAndRecordInfo("停止声源检测...");
 
-            await device!.StopSoundLocationAsync();
+            var result = await device!.StopSoundLocationAsync();
+            if (result == true)
+            {
+                LogAndRecordInfo("停止成功!");
+            }
+            else
+            {
+                LogAndRecordError("停止失败!");
+            }
         }
         #endregion
 
@@ -335,6 +358,7 @@ namespace HK_AcousticImage.ViewModels
             alarmServer.AlarmReceived += AlarmServer_AlarmReceived;
 
             alarmServer.Start();
+            IsRunning = true;
             LogAndRecordInfo($"报警服务启动成功，监听地址：{url}");
         }
 
@@ -365,6 +389,7 @@ namespace HK_AcousticImage.ViewModels
 
             alarmServer.Stop();
             alarmServer = null;
+            IsRunning = false;
 
             LogAndRecordInfo("报警服务已停止");
         }
@@ -382,7 +407,7 @@ namespace HK_AcousticImage.ViewModels
                 try
                 {
                     // 1. 停止采集
-                    LogAndRecordInfo("收到报警，先停止声源检测...");
+                    //LogAndRecordInfo("收到报警，先停止声源检测...");
                     await StopSoundAsync();
 
                     // 切换 FilterTime
@@ -390,11 +415,11 @@ namespace HK_AcousticImage.ViewModels
                     filterTimeIndex = (filterTimeIndex + 1) % filterTimeOptions.Length;  // 轮换下一个
 
                     // 2. 重新设定参数
-                    LogAndRecordInfo("重新设定声学检漏参数...");
+                    //LogAndRecordInfo("重新设定声学检漏参数...");
                     await SetAcousticParamsAsync();
 
                     // 3. 再次启动采集
-                    LogAndRecordInfo("重新启动声源检测...");
+                    //LogAndRecordInfo("重新启动声源检测...");
                     await StartSoundAsync();
 
                     LogAndRecordInfo("报警处理流程完成 ✅");
@@ -431,8 +456,6 @@ namespace HK_AcousticImage.ViewModels
                 LogAndRecordInfo("已停止播放");
             }
         }
-
-
 
         public VlcMediaPlayer GetMediaPlayer() => _mediaPlayer;
 

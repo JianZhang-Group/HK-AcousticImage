@@ -66,7 +66,7 @@
                                     Command="{Binding GetAlarmHostsCommand}"/>
                             <Button Content="保存配置" Width="100" Margin="0,0,10,0"
                                     Command="{Binding ConfigAlarmHostCommand}"/>
-                            <Button Content="测试连接" Width="100 "
+                            <Button Content="测试连接(不可用)" Width="100 "
                                     Command="{Binding TestAlarmHostCommand}"/>
                         </StackPanel>
                     </StackPanel>
@@ -75,9 +75,9 @@
                 <!-- 声学检漏参数 -->
                 <GroupBox Header="声学检漏参数" Margin="0,0,0,10">
                     <StackPanel Orientation="Horizontal" Margin="10">
-                        <Label Content="过滤时间:" Width="63"/>
+                        <Label Content="过滤时间:" Width="60"/>
                         <TextBox Width="40" Text="{Binding FilterTime}"/>
-                        <Label Content="分析时长:" Width="62" Margin="10,0,0,0"/>
+                        <Label Content="分析时长:" Width="60" Margin="10,0,0,0"/>
                         <TextBox Width="46" Text="{Binding AnalysisTime}"/>
                         <Button Content="获取" Width="70" Margin="10,0,0,0"
                                 Command="{Binding GetAcousticParamsCommand}"/>
@@ -103,6 +103,24 @@
                                 Command="{Binding StartAlarmServerCommand}"/>
                         <Button Content="停止服务" Width="100"
                                 Command="{Binding StopAlarmServerCommand}"/>
+                        <!-- 状态灯 -->
+                        <TextBlock Text="服务状态:"  Margin="10,0,10,0"/>
+                        <Ellipse Width="20" Height="20" Margin="10,0"
+             VerticalAlignment="Center">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill" Value="Gray"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                            <Setter Property="Fill" Value="LimeGreen"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsRunning}" Value="False">
+                                            <Setter Property="Fill" Value="Red"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
                     </StackPanel>
                 </GroupBox>
 
@@ -118,7 +136,7 @@
             </StackPanel>
 
             <!-- 右侧视频 -->
-            <GroupBox Header="视频播放" Grid.Column="1" Margin="10,10,10,10">
+            <GroupBox Header="视频播放" Grid.Column="1" Margin="10,0,10,20">
                 <vlc:VideoView x:Name="videoView">
                 </vlc:VideoView>
             </GroupBox>

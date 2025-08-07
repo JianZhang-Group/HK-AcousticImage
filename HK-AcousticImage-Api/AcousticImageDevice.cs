@@ -161,29 +161,114 @@ namespace HK_AcousticImage_Api
         }
 
         // 启动声源检测
-        public async Task StartSoundLocationAsync()
+        public async Task<bool> StartSoundLocationAsync()
         {
             string url = $"http://{deviceIp}/ISAPI/System/SoundSourceLocation/AudioIn/{audioInId}/SoundSourceLocationRuleParams?format=json";
             var payload = JsonConvert.SerializeObject(new { enabled = true });
             var content = new StringContent(payload, Encoding.UTF8, "application/json");
             var resp = await httpClient.PutAsync(url, content);
             if (resp.StatusCode == HttpStatusCode.OK)
+            {
                 logger.Info("✅ 声源检测已启动");
+                return true;
+            }
             else
+            {
                 logger.Warn("❌ 启动失败: " + await resp.Content.ReadAsStringAsync());
+                return false;
+            }
+                
         }
 
         // 停止声源检测
-        public async Task StopSoundLocationAsync()
+        public async Task<bool> StopSoundLocationAsync()
         {
             string url = $"http://{deviceIp}/ISAPI/System/SoundSourceLocation/AudioIn/{audioInId}/SoundSourceLocationRuleParams?format=json";
             var payload = JsonConvert.SerializeObject(new { enabled = false });
             var content = new StringContent(payload, Encoding.UTF8, "application/json");
             var resp = await httpClient.PutAsync(url, content);
             if (resp.StatusCode == HttpStatusCode.OK)
+            {
                 logger.Info("✅ 声源检测已停止");
+                return true;
+            }
+
             else
+            {
                 logger.Warn("❌ 停止失败: " + await resp.Content.ReadAsStringAsync());
+                return false;
+            }   
+        }
+
+        // 获取音频侦测能力
+        public async Task<string?> GetAudioDetectionCapabilitiesAsync(string channelId)
+        {
+            string url = $"http://{deviceIp}/ISAPI/Smart/AudioDetection/channels/{channelId}/capabilities";
+            var resp = await httpClient.GetAsync(url);
+            var content = await resp.Content.ReadAsStringAsync();
+
+            if (resp.StatusCode == HttpStatusCode.OK)
+            {
+                logger.Info("📊 音频侦测能力参数(XML)：" + content);
+                return content;
+            }
+            logger.Warn("❌ 获取音频侦测能力失败: " + (int)resp.StatusCode + "\n" + content);
+            return null;
+        }
+
+        // 获取音频侦测参数
+        public async Task<string?> GetAudioDetectionParamsAsync(string channelId)
+        {
+            string url = $"http://{deviceIp}/ISAPI/Smart/AudioDetection/channels/{channelId}";
+            var resp = await httpClient.GetAsync(url);
+            var content = await resp.Content.ReadAsStringAsync();
+
+            if (resp.StatusCode == HttpStatusCode.OK)
+            {
+                logger.Info("📋 当前音频侦测参数(XML)：" + content);
+                return content;
+            }
+            logger.Warn("❌ 获取音频侦测参数失败: " + (int)resp.StatusCode + "\n" + content);
+            return null;
+        }
+
+        // 设置音频侦测参数
+        public async Task<string?> SetAudioDetectionParamsAsync(
+            string channelId,
+            int audioMode = 0,
+            int decibelThreshold = 0,
+            float decibelThresholdDuration = 0,
+            bool frequencyEnabled = true,
+            int frequencyThreshold = 0,
+            float frequencyThresholdDuration = 0)
+        {
+            string url = $"http://{deviceIp}/ISAPI/Smart/AudioDetection/channels/{channelId}";
+
+            // 构造 XML 报文
+            string payload = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
+                <AudioDetection xmlns=""http://www.isapi.org/ver20/XMLSchema"" version=""2.0"">
+                <id>{channelId}</id>
+                <audioMode>{audioMode}</audioMode>
+                <decibelThreshold>{decibelThreshold}</decibelThreshold>
+                <decibelThresholdDuration>{decibelThresholdDuration}</decibelThresholdDuration>
+                <frequencyThresholdDetectionParams>
+                <enabled>{frequencyEnabled.ToString().ToLower()}</enabled>
+                <frequencyThreshold>{frequencyThreshold}</frequencyThreshold>
+                <frequencyThresholdDuration>{frequencyThresholdDuration}</frequencyThresholdDuration>
+                </frequencyThresholdDetectionParams>
+                </AudioDetection>";
+
+            var content = new StringContent(payload, Encoding.UTF8, "application/xml");
+            var resp = await httpClient.PutAsync(url, content);
+            var respText = await resp.Content.ReadAsStringAsync();
+
+            if (resp.StatusCode == HttpStatusCode.OK)
+            {
+                logger.Info("✅ 音频侦测参数设置成功(XML)：" + respText);
+                return respText;
+            }
+            logger.Warn("❌ 设置音频侦测参数失败: " + (int)resp.StatusCode + "\n" + respText);
+            return null;
         }
 
         // 获取声学检漏能力
