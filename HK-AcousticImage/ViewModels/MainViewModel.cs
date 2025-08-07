@@ -5,18 +5,22 @@ using Newtonsoft.Json;
 using NLog;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.IO;
 using System.Net.NetworkInformation;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using static HK_AcousticImage.ViewModels.ListBoxAutoScrollBehavior;
 using NLogLevel = NLog.LogLevel;
 using VlcLogLevel = LibVLCSharp.Shared.LogLevel;
 using VlcMediaPlayer = LibVLCSharp.Shared.MediaPlayer;
 
 namespace HK_AcousticImage.ViewModels
 {
+    #region VIEWMODEL
     public class MainViewModel : BindableBase
     {
         #region 字段与初始化
@@ -32,9 +36,12 @@ namespace HK_AcousticImage.ViewModels
 
         private int[] filterTimeOptions = new int[] { 60, 120 };
         private int filterTimeIndex = 0;
+        private const int MaxImages = 10;
+        private const int MaxLogNum = 100;
         #endregion
 
-        # region 属性绑定
+        #region 属性绑定
+        public ObservableCollection<AlarmImageEntry> AlarmImages { get; } = new ObservableCollection<AlarmImageEntry>();
         private string _deviceIp = "192.168.31.64";
         public string DeviceIp
         {
@@ -141,6 +148,8 @@ namespace HK_AcousticImage.ViewModels
         public ICommand GetAcousticParamsCommand { get; }
         public ICommand SetAcousticParamsCommand { get; }
 
+        public ICommand ShowImageCommand { get; }
+
         #endregion
 
         #region 命令绑定初始化
@@ -162,6 +171,7 @@ namespace HK_AcousticImage.ViewModels
             StopRtspCommand = new DelegateCommand(OnStopRtsp);
             GetAcousticParamsCommand = new DelegateCommand(async () => await GetAcousticParamsAsync());
             SetAcousticParamsCommand = new DelegateCommand(async () => await SetAcousticParamsAsync());
+            ShowImageCommand = new DelegateCommand<AlarmImageEntry>(ShowImage);
         }
         #endregion
 
@@ -356,6 +366,7 @@ namespace HK_AcousticImage.ViewModels
             string url = $"http://+:{HostPort}/";
             alarmServer = new AlarmHttpServer(url);
             alarmServer.AlarmReceived += AlarmServer_AlarmReceived;
+            alarmServer.ImageReceived += AlarmServer_ImageReceived;
 
             alarmServer.Start();
             IsRunning = true;
@@ -386,6 +397,8 @@ namespace HK_AcousticImage.ViewModels
             }
 
             alarmServer.AlarmReceived -= AlarmServer_AlarmReceived;
+            alarmServer.ImageReceived -= AlarmServer_ImageReceived;
+
 
             alarmServer.Stop();
             alarmServer = null;
@@ -429,6 +442,73 @@ namespace HK_AcousticImage.ViewModels
                     LogAndRecordWarn($"报警处理失败：{ex.Message}");
                 }
             });
+        }
+
+        private void AlarmServer_ImageReceived(object? sender, BitmapImage image)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                if (AlarmImages.Count >= MaxImages)
+                    AlarmImages.RemoveAt(0);
+
+                AlarmImages.Add(new AlarmImageEntry
+                {
+                    Image = image,
+                    Time = DateTime.Now
+                });
+            });
+        }
+
+        public void AddAlarmImage(Stream imageStream)
+        {
+            try
+            {
+                imageStream.Position = 0;
+                var image = new BitmapImage();
+                image.BeginInit();
+                image.CacheOption = BitmapCacheOption.OnLoad;
+                image.StreamSource = imageStream;
+                image.EndInit();
+                image.Freeze();
+
+                if (AlarmImages.Count >= MaxImages)
+                    AlarmImages.RemoveAt(0);
+
+                AlarmImages.Add(new AlarmImageEntry
+                {
+                    Image = image,
+                    Time = DateTime.Now
+                });
+            }
+            catch (Exception ex)
+            {
+                LogAndRecordError("❌ 图片加载失败: " + ex.Message);
+            }
+            finally
+            {
+                imageStream.Dispose();
+            }
+        }
+
+        private void ShowImage(AlarmImageEntry? entry)
+        {
+            if (entry == null) return;
+
+            var window = new Window
+            {
+                Title = "报警图片查看",
+                Width = 800,
+                Height = 600,
+                Content = new ScrollViewer
+                {
+                    Content = new Image
+                    {
+                        Source = entry.Image,
+                        Stretch = Stretch.Uniform
+                    }
+                }
+            };
+            window.ShowDialog();
         }
         #endregion
 
@@ -491,14 +571,15 @@ namespace HK_AcousticImage.ViewModels
             Application.Current.Dispatcher.Invoke(() =>
             {
                 LogMessages.Add(new LogEntry { Level = level, Message = message });
-                if (LogMessages.Count > 10) // 避免爆内存
+                if (LogMessages.Count > MaxLogNum) // 避免爆内存
                     LogMessages.RemoveAt(0);
             });
         }
-
-
+        #endregion
     }
+    #endregion
 
+    #region 日志类
     public class LogEntry
     {
         public string Time { get; set; } = DateTime.Now.ToString("HH:mm:ss");
@@ -569,7 +650,14 @@ namespace HK_AcousticImage.ViewModels
                 }
             }
         }
-        #endregion
     }
+    #endregion
 
+    #region 报警图片类
+    public class AlarmImageEntry
+    {
+        public BitmapImage Image { get; set; } = default!;
+        public DateTime Time { get; set; }
+    }
+    #endregion
 }

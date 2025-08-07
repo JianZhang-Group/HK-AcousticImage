@@ -3,6 +3,7 @@ using NLog;
 using System.IO;
 using System.Net;
 using System.Text;
+using System.Windows.Media.Imaging;
 using System.Xml;
 
 namespace HK_AcousticImage_Api
@@ -39,6 +40,7 @@ namespace HK_AcousticImage_Api
 
         // 新增报警事件
         public event EventHandler<AlarmEventArgs> AlarmReceived;
+        public event EventHandler<BitmapImage>? ImageReceived;
 
         public AlarmHttpServer(string host = "http://+:8080/")
         {
@@ -173,6 +175,30 @@ namespace HK_AcousticImage_Api
                         using var reader = new StreamReader(file.Data, Encoding.UTF8);
                         string xmlText = reader.ReadToEnd();
                         ParseAlarmXml(xmlText);
+                    }
+                    //else if (filename.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) || filename.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+                    else
+                    {
+                        var ms = new MemoryStream();
+                        file.Data.CopyTo(ms);
+                        ms.Position = 0;
+
+                        try
+                        {
+                            var image = new BitmapImage();
+                            image.BeginInit();
+                            image.CacheOption = BitmapCacheOption.OnLoad;
+                            image.StreamSource = ms;
+                            image.EndInit();
+                            image.Freeze(); // 避免跨线程报错
+
+                            // 触发事件
+                            ImageReceived?.Invoke(this, image);
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.Warn($"⚠️ 图片解析失败: {ex.Message}");
+                        }
                     }
                 }
 
