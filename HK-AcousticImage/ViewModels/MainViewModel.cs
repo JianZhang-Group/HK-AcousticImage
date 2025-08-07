@@ -36,7 +36,7 @@ namespace HK_AcousticImage.ViewModels
 
         private int[] filterTimeOptions = new int[] { 60, 120 };
         private int filterTimeIndex = 0;
-        private const int MaxImages = 10;
+        private const int MaxImages = 8;
         private const int MaxLogNum = 100;
         #endregion
 
@@ -120,7 +120,7 @@ namespace HK_AcousticImage.ViewModels
             set => SetProperty(ref _filterTime, value);
         }
 
-        private int _analysisTime = 10;
+        private int _analysisTime = 6;
         public int AnalysisTime
         {
             get => _analysisTime;
@@ -149,6 +149,7 @@ namespace HK_AcousticImage.ViewModels
         public ICommand SetAcousticParamsCommand { get; }
         public ICommand GetAudioDetectionParamsCommand { get; }
         public ICommand ShowImageCommand { get; }
+        public ICommand SaveImageCommand { get; }
 
         #endregion
 
@@ -173,7 +174,7 @@ namespace HK_AcousticImage.ViewModels
             SetAcousticParamsCommand = new DelegateCommand(async () => await SetAcousticParamsAsync());
             GetAudioDetectionParamsCommand = new DelegateCommand(async () => await GetAudioDetectionParamsAsync());
             ShowImageCommand = new DelegateCommand<AlarmImageEntry>(ShowImage);
-
+            SaveImageCommand = new DelegateCommand<AlarmImageEntry>(SaveImage);
         }
         #endregion
 
@@ -531,6 +532,45 @@ namespace HK_AcousticImage.ViewModels
             };
             window.ShowDialog();
         }
+
+        private void SaveImage(AlarmImageEntry? entry)
+        {
+            if (entry == null)
+                return;
+
+            Microsoft.Win32.SaveFileDialog dlg = new Microsoft.Win32.SaveFileDialog
+            {
+                FileName = $"Alarm_{entry.Time:yyyyMMdd_HHmmss}", // 默认文件名
+                DefaultExt = ".png",                               // 默认扩展名
+                Filter = "PNG 图片 (*.png)|*.png|JPEG 图片 (*.jpg)|*.jpg|所有文件 (*.*)|*.*" // 文件类型
+            };
+
+            bool? result = dlg.ShowDialog();
+
+            if (result == true)
+            {
+                try
+                {
+                    BitmapEncoder encoder;
+                    string ext = System.IO.Path.GetExtension(dlg.FileName).ToLower();
+                    if (ext == ".jpg" || ext == ".jpeg")
+                        encoder = new JpegBitmapEncoder();
+                    else
+                        encoder = new PngBitmapEncoder();
+
+                    encoder.Frames.Add(BitmapFrame.Create(entry.Image));
+                    using var fileStream = new FileStream(dlg.FileName, FileMode.Create);
+                    encoder.Save(fileStream);
+
+                    LogAndRecordInfo($"图片已保存至：{dlg.FileName}");
+                }
+                catch (Exception ex)
+                {
+                    LogAndRecordError($"保存图片失败：{ex.Message}");
+                }
+            }
+        }
+
         #endregion
 
         #region 视频播放控制

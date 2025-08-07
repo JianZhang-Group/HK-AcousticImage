@@ -153,16 +153,21 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <StackPanel Margin="5">
+                                        <StackPanel Margin="5" Width="170">
                                             <!-- 点击缩略图放大 -->
                                             <Button BorderThickness="0" Padding="0" Background="Transparent"
-                                Command="{Binding DataContext.ShowImageCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                CommandParameter="{Binding}">
+                                                Command="{Binding DataContext.ShowImageCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}">
                                                 <Image Source="{Binding Image}" Width="160" Height="120"/>
                                             </Button>
+
                                             <!-- 显示时间 -->
-                                            <TextBlock Text="{Binding Time, StringFormat='yyyy-MM-dd HH:mm:ss'}"
-                                   FontSize="12" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Time, StringFormat='yyyy-MM-dd HH:mm:ss'}" FontSize="12" HorizontalAlignment="Center"/>
+
+                                            <!-- 保存按钮 -->
+                                            <Button Content="保存" Margin="0,5,0,0" Height="24"
+                                                Command="{Binding DataContext.SaveImageCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
