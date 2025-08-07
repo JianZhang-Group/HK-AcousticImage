@@ -26,4 +26,10 @@
     <ProjectReference Include="..\HK-AcousticImage-Api\HK-AcousticImage-Api.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="NLog.config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
