@@ -332,10 +332,10 @@ namespace HK_AcousticImage.ViewModels
             }
         }
 
-        private async Task StartSoundAsync()
+        private async Task<bool> StartSoundAsync()
         {
             if (!CheckDevice())
-                return;
+                return false;
 
             LogAndRecordInfo("启动声源检测...");
 
@@ -343,17 +343,19 @@ namespace HK_AcousticImage.ViewModels
             if (result == true)
             {
                 LogAndRecordInfo("启动成功!");
+                return true;
             }
             else
             {
                 LogAndRecordError("启动失败!");
+                return false;
             }
         }
 
-        private async Task StopSoundAsync()
+        private async Task<bool> StopSoundAsync()
         {
             if (!CheckDevice())
-                return;
+                return false;
 
             LogAndRecordInfo("停止声源检测...");
 
@@ -361,10 +363,12 @@ namespace HK_AcousticImage.ViewModels
             if (result == true)
             {
                 LogAndRecordInfo("停止成功!");
+                return true;
             }
             else
             {
                 LogAndRecordError("停止失败!");
+                return false;
             }
         }
         #endregion
@@ -635,6 +639,36 @@ namespace HK_AcousticImage.ViewModels
                 if (LogMessages.Count > MaxLogNum) // 避免爆内存
                     LogMessages.RemoveAt(0);
             });
+        }
+        #endregion
+        #region 程序退出
+        public void Cleanup()
+        {
+            LogAndRecordInfo("🧹 程序退出，正在清理资源...");
+
+            // 停止报警服务
+            if (alarmServer != null)
+            {
+                alarmServer.Stop();
+                alarmServer = null;
+                LogAndRecordInfo("✅ 报警服务已停止");
+            }
+
+            // 停止 RTSP 播放
+            _mediaPlayer?.Stop();
+            _mediaPlayer?.Dispose();
+            _libVLC?.Dispose();
+            LogAndRecordInfo("✅ RTSP 播放资源已释放");
+
+            // 如果有设备连接
+            if (device != null)
+            {
+                // 停止检测
+                StopSoundAsync();
+                device = null;
+                LogAndRecordInfo("停止检测");
+            }
+            LogAndRecordInfo("✅ 资源清理完毕，程序即将退出");
         }
         #endregion
     }

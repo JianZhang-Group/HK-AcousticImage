@@ -1,4 +1,5 @@
 ﻿using HK_AcousticImage.ViewModels;
+using System.ComponentModel;
 using System.Windows;
 
 namespace HK_AcousticImage
@@ -8,15 +9,23 @@ namespace HK_AcousticImage
     /// </summary>
     public partial class MainWindow : Window
     {
+        private readonly MainViewModel vm; // 声明为字段
+
         public MainWindow()
         {
             InitializeComponent();
 
-            var vm = new MainViewModel();
+            vm = new MainViewModel(); // 初始化字段
             this.DataContext = vm;
 
             // 将 MediaPlayer 绑定到 VideoView
             videoView.MediaPlayer = vm.GetMediaPlayer();
+        }
+
+        protected override void OnClosing(CancelEventArgs e)
+        {
+            base.OnClosing(e);
+            vm.Cleanup();
         }
     }
 }
