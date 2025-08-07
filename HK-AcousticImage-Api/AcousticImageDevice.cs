@@ -39,7 +39,120 @@ namespace HK_AcousticImage_Api
                 Timeout = TimeSpan.FromSeconds(10)
             };
         }
+        #region 时间配置
+        // 时间管理能力
+        public async Task<string?> GetTimeCapabilitiesAsync()
+        {
+            string url = $"http://{deviceIp}/ISAPI/System/time/capabilities";
+            var resp = await httpClient.GetAsync(url);
+            var respText = await resp.Content.ReadAsStringAsync();
 
+            if (resp.StatusCode == HttpStatusCode.OK)
+            {
+                logger.Info("✅ 获取时间管理能力成功");
+                return respText;
+            }
+
+            logger.Warn($"❌ 获取时间管理能力失败: {(int)resp.StatusCode}\n{respText}");
+            return null;
+        }
+        // 获取设备当前时间设置
+        public async Task<string?> GetDeviceTimeAsync()
+        {
+            string url = $"http://{deviceIp}/ISAPI/System/time";
+            var resp = await httpClient.GetAsync(url);
+            var respText = await resp.Content.ReadAsStringAsync();
+
+            if (resp.StatusCode == HttpStatusCode.OK)
+            {
+                logger.Info("✅ 获取设备时间成功");
+                return respText;
+            }
+
+            logger.Warn($"❌ 获取设备时间失败: {(int)resp.StatusCode}\n{respText}");
+            return null;
+        }
+        // 配置设备时间参数
+        public async Task<bool> SetDeviceTimeAsync(string timeMode = "manual", string? localTime = null, string? timeZone = null)
+        {
+            string url = $"http://{deviceIp}/ISAPI/System/time";
+
+            string payload = $@"
+        <?xml version=""1.0"" encoding=""UTF-8""?>
+        <Time xmlns=""http://www.hikvision.com/ver20/XMLSchema"" version=""2.0"">
+            <timeMode>{timeMode}</timeMode>
+            {(localTime != null ? $"<localTime>{localTime}</localTime>" : "")}
+            {(timeZone != null ? $"<timeZone>{timeZone}</timeZone>" : "")}
+        </Time>";
+
+            var content = new StringContent(payload, Encoding.UTF8, "application/xml");
+            var resp = await httpClient.PutAsync(url, content);
+            var respText = await resp.Content.ReadAsStringAsync();
+
+            if (resp.StatusCode == HttpStatusCode.OK)
+            {
+                logger.Info("✅ 设置设备时间成功");
+                return true;
+            }
+
+            logger.Warn($"❌ 设置设备时间失败: {(int)resp.StatusCode}\n{respText}");
+            return false;
+        }
+        // 获取全部 NTP 服务器
+        public async Task<string?> GetAllNtpServersAsync()
+        {
+            string url = $"http://{deviceIp}/ISAPI/System/time/ntpServers";
+            var resp = await httpClient.GetAsync(url);
+            var respText = await resp.Content.ReadAsStringAsync();
+
+            if (resp.StatusCode == HttpStatusCode.OK)
+            {
+                logger.Info("✅ 获取 NTP 服务器列表成功");
+                return respText;
+            }
+
+            logger.Warn($"❌ 获取 NTP 服务器失败: {(int)resp.StatusCode}\n{respText}");
+            return null;
+        }
+        // 配置单个 NTP 服务器
+        public async Task<bool> ConfigNtpServerAsync(
+            int id = 1,
+            string addressingType = "hostname",
+            string hostName = "ntp.example.com",
+            string ipAddress = "",
+            string ipv6Address = "",
+            int port = 123,
+            int interval = 1440)
+        {
+            string url = $"http://{deviceIp}/ISAPI/System/time/ntpServers/{id}";
+
+            string payload = $@"
+        <?xml version=""1.0"" encoding=""UTF-8""?>
+        <NTPServer xmlns=""http://www.isapi.org/ver20/XMLSchema"" version=""2.0"">
+            <id>{id}</id>
+            <addressingFormatType>{addressingType}</addressingFormatType>
+            {(addressingType == "hostname" ? $"<hostName>{hostName}</hostName>" : $"<ipAddress>{ipAddress}</ipAddress>")}
+            {(string.IsNullOrWhiteSpace(ipv6Address) ? "" : $"<ipv6Address>{ipv6Address}</ipv6Address>")}
+            <portNo>{port}</portNo>
+            <synchronizeInterval>{interval}</synchronizeInterval>
+        </NTPServer>";
+
+            var content = new StringContent(payload, Encoding.UTF8, "application/xml");
+            var resp = await httpClient.PutAsync(url, content);
+            var respText = await resp.Content.ReadAsStringAsync();
+
+            if (resp.StatusCode == HttpStatusCode.OK)
+            {
+                logger.Info($"✅ 设置 NTP 服务器成功：{hostName}/{ipAddress}:{port}");
+                return true;
+            }
+
+            logger.Warn($"❌ 设置 NTP 服务器失败: {(int)resp.StatusCode}\n{respText}");
+            return false;
+        }
+        #endregion
+
+        #region 登录配置
         // 检查设备账号密码是否正确
         public async Task<(bool, string)> CheckLoginAsync()
         {
@@ -69,7 +182,9 @@ namespace HK_AcousticImage_Api
                 return (false, $"连接异常: {ex.Message}");
             }
         }
+        #endregion
 
+        #region 监听配置
         // 检查监听能力
         public async Task<bool> CheckCapabilitiesAsync()
         {
@@ -159,7 +274,9 @@ namespace HK_AcousticImage_Api
                 return false;
             }
         }
+        #endregion
 
+        #region 声源检测
         // 启动声源检测
         public async Task<bool> StartSoundLocationAsync()
         {
@@ -198,7 +315,9 @@ namespace HK_AcousticImage_Api
                 return false;
             }   
         }
+        #endregion
 
+        #region 音频侦测
         // 获取音频侦测能力
         public async Task<string?> GetAudioDetectionCapabilitiesAsync()
         {
@@ -244,7 +363,7 @@ namespace HK_AcousticImage_Api
 
             // 构造 XML 报文
             string payload = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
-                <AudioDetection xmlns=""http://www.hikivision.com/ver20/XMLSchema"" version=""2.0"">
+                <AudioDetection xmlns=""http://www.hikvision.com/ver20/XMLSchema"" version=""2.0"">
                 <id>{audioInId}</id>
                 <audioMode>{audioMode}</audioMode>
                 <decibelThreshold>{decibelThreshold}</decibelThreshold>
@@ -268,7 +387,9 @@ namespace HK_AcousticImage_Api
             logger.Warn("❌ 设置音频侦测参数失败: " + (int)resp.StatusCode + "\n" + respText);
             return null;
         }
+        #endregion
 
+        #region 声学检漏
         // 获取声学检漏能力
         public async Task<dynamic?> GetAcousticCapabilitiesAsync()
         {
@@ -330,5 +451,6 @@ namespace HK_AcousticImage_Api
             logger.Warn("❌ 获取气体泄漏检测规则失败: " + (int)resp.StatusCode + "\n" + content);
             return null;
         }
+        #endregion
     }
 }
